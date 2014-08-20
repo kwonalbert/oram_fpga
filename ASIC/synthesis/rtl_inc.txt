@@ -1,0 +1,12 @@
+../../gatelib/
+../../oram/
+../../oram/include/
+../../oram/frontend/
+../../oram/stash/
+../../oram/addr/
+../../oram/encryption/
+../../oram/encryption/basic/core_ip/rtl/verilog/
+../../oram/encryption/rew/
+../../oram/integrity
+
+
