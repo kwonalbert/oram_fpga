@@ -74,14 +74,14 @@ module	SynthesizedDRAM(
 			Clock,
 			Reset,
 			//------------------------------------------------------------------
-	
+
 			//------------------------------------------------------------------
 			//	Status Outputs
 			//------------------------------------------------------------------
 			Initialized,
 			PoweredUp,
 			//------------------------------------------------------------------
-	
+
 			//------------------------------------------------------------------
 			//	Command Interface
 			//------------------------------------------------------------------
@@ -90,7 +90,7 @@ module	SynthesizedDRAM(
 			CommandValid,
 			CommandReady,
 			//------------------------------------------------------------------
-	
+
 			//------------------------------------------------------------------
 			//	Data Input (Write) Interface
 			//------------------------------------------------------------------
@@ -99,7 +99,7 @@ module	SynthesizedDRAM(
 			DataInValid,
 			DataInReady,
 			//------------------------------------------------------------------
-	
+
 			//------------------------------------------------------------------
 			//	Data Output (Read) Interface
 			//------------------------------------------------------------------
@@ -122,7 +122,7 @@ module	SynthesizedDRAM(
 							RLatency =				1,
 							WLatency =				1;
 	//--------------------------------------------------------------------------
-	
+
 	//--------------------------------------------------------------------------
 	//	Fixed Constants
 	//--------------------------------------------------------------------------
@@ -137,7 +137,7 @@ module	SynthesizedDRAM(
 	`endif
 	`include "DRAM.constants"
 	//--------------------------------------------------------------------------
-	
+
 	//--------------------------------------------------------------------------
 	//	Internal Constants
 	//--------------------------------------------------------------------------
@@ -150,20 +150,20 @@ module	SynthesizedDRAM(
 	`endif
 							RAWidth =				AWidth-UAWidth;
 	//--------------------------------------------------------------------------
-	
+
 	//--------------------------------------------------------------------------
 	//	System I/O
 	//--------------------------------------------------------------------------
 	input					Clock, Reset;
 	//--------------------------------------------------------------------------
-	
+
 	//--------------------------------------------------------------------------
 	//	Status Outputs
 	//--------------------------------------------------------------------------
 	output					Initialized;
 	output					PoweredUp;
 	//--------------------------------------------------------------------------
-	
+
 	//--------------------------------------------------------------------------
 	//	Command Interface
 	//--------------------------------------------------------------------------
@@ -172,7 +172,7 @@ module	SynthesizedDRAM(
 	input					CommandValid;
 	output					CommandReady;
 	//--------------------------------------------------------------------------
-	
+
 	//--------------------------------------------------------------------------
 	//	Data Input (Write) Interface
 	//--------------------------------------------------------------------------
@@ -181,7 +181,7 @@ module	SynthesizedDRAM(
 	input					DataInValid;
 	output					DataInReady;
 	//--------------------------------------------------------------------------
-	
+
 	//--------------------------------------------------------------------------
 	//	Data Output (Read) Interface
 	//--------------------------------------------------------------------------
@@ -191,7 +191,7 @@ module	SynthesizedDRAM(
 	output					DataOutValid;
 	input					DataOutReady;
 	//--------------------------------------------------------------------------
-	
+
 	//--------------------------------------------------------------------------
 	//	Wires
 	//--------------------------------------------------------------------------
@@ -199,10 +199,10 @@ module	SynthesizedDRAM(
 	wire	[DWidth-1:0]	RAMDataIn;
 	wire	[DWidth-1:0]	RAMDataOut;
 	wire	[UCount-1:0]	RAMEnable, RAMWrite, RAMRead;
-	
+
 	genvar					i;
 	//--------------------------------------------------------------------------
-	
+
 	//--------------------------------------------------------------------------
 	//	DRAM2RAM
 	//--------------------------------------------------------------------------
@@ -238,35 +238,36 @@ module	SynthesizedDRAM(
 								.RAMWrite(			RAMWrite),
 								.RAMRead(			RAMRead));
 	//--------------------------------------------------------------------------
-	
+
 	//--------------------------------------------------------------------------
 	//	RAM
 	//--------------------------------------------------------------------------
-	
-	// TODO FIXME
+
 	wire	[DWidth-1:0]	RAMDataOut_Pre;
-	
-	// SUPER HACKY --- Vivado doesn't let us initialize large memories :(
-	/*
-	
-	reg						ReadBefore[0:1 << RAWidth-1];
-	reg	[RAWidth-1:0] AddrDelay;
-	
-	initial $readmemh("M0.mif", ReadBefore);
-	
-	always @(posedge Clock) begin
-		if (|RAMWrite) ReadBefore[RAMAddress] <= 1'b1;
-		
-		AddrDelay <= RAMAddress;
-	end*/
-	
-	assign	RAMDataOut =		(RAMDataOut_Pre !== 512'hx) ? RAMDataOut_Pre : //(ReadBefore[AddrDelay]) ? RAMDataOut_Pre : 
-								//512'h00deadbeef00000000;
-								512'ha3deadbeef00000000;
-	
+
+	// if a bucket hasn't been read before, its header IV == 0
+    assign	RAMDataOut =  	(RAMDataOut_Pre !== 512'hx) ? RAMDataOut_Pre : 512'h0;
+
+	// Partition the RAM by making the data width smaller
+	parameter 	UCountI = 	8,
+			 	UWidthI =	UWidth / UCountI;
+
+	// Partition the RAM by making the address width per RAM smaller
+	parameter	ACountI =	2,
+				ASelI =		`log2(ACountI),
+				RAWidthI =	RAWidth - ASelI;
+
+	// NOTE: we have UWidthI and AWidthI because
+	//	1.) sim tools (VCS...) but caps on a single RAM's W and D
+	//	2.) We don't want to change the SynthesizedDRAM interface
+
+	genvar j, k;
 	generate for (i = 0; i < UCount; i = i + 1) begin:RAM_BLOCK
-		RAM			#(			.DWidth(			UWidth),
-								.AWidth(			RAWidth),
+		for (j = 0; j < UCountI; j = j + 1) begin:RAM_BLOCK_DW_INNER
+			wire	[UWidthI*ACountI-1:0] ACDataOut;
+			for (k = 0; k < ACountI; k = k + 1) begin:RAM_BLOCK_AW_INNER
+				RAM	#(		 	.DWidth(			UWidthI),
+								.AWidth(			RAWidthI),
 								.RLatency(			RLatency),
 								.WLatency(			WLatency),
 								.NPorts(			1),
@@ -274,11 +275,18 @@ module	SynthesizedDRAM(
 					RAM(		.Clock(				Clock),
 								.Reset(				Reset),
 								.Enable(			RAMEnable[i]),
-								.Write(				RAMWrite[i]),
-								.Address(			RAMAddress),
-								.DIn(				RAMDataIn[(UWidth*i)+UWidth-1:UWidth*i]),
-								.DOut(				RAMDataOut_Pre[(UWidth*i)+UWidth-1:UWidth*i]));
+								.Write(				RAMWrite[i] && RAMAddress[RAWidth-1:RAWidthI] == k),
+								.Address(			RAMAddress[RAWidthI-1:0]),
+								.DIn(				RAMDataIn[UWidth*i+UWidthI*(j+1)-1:UWidth*i+UWidthI*j]),
+								.DOut(				ACDataOut[UWidthI*(k+1)-1:UWidthI*k]));
+			end
+				Mux	#(.Width(UWidthI), .NPorts(ACountI), .SelectCode(0)) amux(	RAMAddress[RAWidth-1:RAWidthI], 
+																				ACDataOut, 
+																				RAMDataOut_Pre[UWidth*i+UWidthI*j+UWidthI-1:UWidth*i+UWidthI*j]);
+		end
+
 	end endgenerate
+
 	//--------------------------------------------------------------------------
 endmodule
 //------------------------------------------------------------------------------

@@ -77,7 +77,7 @@ module	RAM(Clock, Reset, Enable, Write, Address, DIn, DOut);
 							HexInitFile =			"",
 							AsyncReset =			0;
 
-	parameter 				ASIC = 					0;
+	parameter 				SRAM =					0;
 	//--------------------------------------------------------------------------
 
 	//--------------------------------------------------------------------------
@@ -97,7 +97,8 @@ module	RAM(Clock, Reset, Enable, Write, Address, DIn, DOut);
 	output	[(DWidth*NPorts)-1:0] DOut;
 	//--------------------------------------------------------------------------
 
-	generate if (ASIC == 1 && NPorts == 1) begin:ASIC_SRAM1D
+	generate if (SRAM == 1 && NPorts == 1) begin:ASIC_SRAM1D
+`ifndef FPGA_MEMORY	
 		SRAM1D_WRAP #(		.DWidth(				DWidth), 
 							.AWidth(				AWidth))
 				sram_wrap(	.Clock(					Clock), 
@@ -107,19 +108,20 @@ module	RAM(Clock, Reset, Enable, Write, Address, DIn, DOut);
 							.Address(				Address),
 							.DIn(					DIn),
 							.DOut(					DOut));
-	end else if (ASIC == 1 && NPorts == 2) begin:ASIC_SRAM2S
+`endif
+	end else if (SRAM == 1 && NPorts == 2) begin:ASIC_SRAM2S
+`ifdef SIMULATION
 		initial begin
 			// Note: if you want a simple dual-ported RAM, instantiate SDPRAM
 			$display("TODO");
 			$finish;
 		end
+`endif
 	end else begin:BEHAVIORAL
 		//----------------------------------------------------------------------
 		//	Wires & Regs
 		//----------------------------------------------------------------------
 		reg		[DWidth-1:0]	Mem[0:MaxAddress-1];
-		// attribute ram_style of Mem is block
-		// TODO: remove this ... is it forcing FIFORAM to block ram?
 		
 		genvar					i, j, k;
 		wire					Write_DELAY[NPorts-1:0];
@@ -132,6 +134,7 @@ module	RAM(Clock, Reset, Enable, Write, Address, DIn, DOut);
 		//----------------------------------------------------------------------
 		//	Initialization
 		//----------------------------------------------------------------------
+`ifdef FPGA
 		if (EnableInitial) begin:ENINITVECTOR
 			for (k = 0; k < MaxAddress; k = k + 1) begin:INIT
 				initial	Mem[k] =						Initial[(k*DWidth)+DWidth-1:(k*DWidth)];
@@ -140,6 +143,7 @@ module	RAM(Clock, Reset, Enable, Write, Address, DIn, DOut);
 		if (EnableHexInitFile) begin:ENINITFILE
 			initial $readmemh(HexInitFile, Mem);
 		end 
+`endif
 		//----------------------------------------------------------------------
 
 		//----------------------------------------------------------------------
@@ -188,7 +192,7 @@ module	RAM(Clock, Reset, Enable, Write, Address, DIn, DOut);
 						//------------------------------------------------------
 					end
 				end
-				if (WLatency && RLatency) begin
+				if (WLatency && RLatency) begin:SDP_SYNC
 					always @ (posedge Clock[i]) begin
 						if (Enable[i]) begin
 							DOut_DELAY[i] <= Mem[Address[(AWidth*i)+AWidth-1:(AWidth*i)]];
@@ -270,7 +274,7 @@ module	SDPRAM(Clock, Reset, Write, WriteAddress, WriteData, Read, ReadAddress, R
 							WLatency =				1,
 							EnableInitial =			0,
 							Initial =				0,
-							ASIC = 					0;
+							SRAM = 					0;
 							
 	input					Clock, Reset, Write, Read;
 	input	[AWidth-1:0]	WriteAddress, ReadAddress;						
@@ -279,7 +283,8 @@ module	SDPRAM(Clock, Reset, Write, WriteAddress, WriteData, Read, ReadAddress, R
 	
 	wire	[DWidth-1:0]	DummyReadData;
 
-	generate if (ASIC == 1) begin:SRAM2D
+	generate if (SRAM == 1) begin:SRAM2D
+`ifndef FPGA_MEMORY
 		SRAM2D_WRAP #(      .DWidth(				DWidth),
                             .AWidth(            	AWidth))
                 sram_wrap(  .Clock(             	Clock),
@@ -290,6 +295,7 @@ module	SDPRAM(Clock, Reset, Write, WriteAddress, WriteData, Read, ReadAddress, R
                             .WriteAddress(      	WriteAddress),
                             .DIn(               	WriteData),
                             .DOut(              	ReadData));
+`endif
 	end else begin:BEHAVIORAL
 		RAM			#(		.DWidth(				DWidth),
 							.AWidth(				AWidth),

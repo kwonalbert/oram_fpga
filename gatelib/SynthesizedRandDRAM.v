@@ -1,72 +1,6 @@
-//==============================================================================
-//	File:		$URL: svn+ssh://repositorypub@repository.eecs.berkeley.edu/public/Projects/GateLib/branches/dev/Firmware/DRAM/Hardware/SynthesizedDRAM/SynthesizedDRAM.v $
-//	Version:	$Revision: 26904 $
-//	Author:		Greg Gibeling (http://www.gdgib.com)
-//	Copyright:	Copyright 2005-2010 UC Berkeley
-//==============================================================================
 
-//==============================================================================
-//	Section:	License
-//==============================================================================
-//	Copyright (c) 2005-2010, Regents of the University of California
-//	All rights reserved.
-//
-//	Redistribution and use in source and binary forms, with or without modification,
-//	are permitted provided that the following conditions are met:
-//
-//		- Redistributions of source code must retain the above copyright notice,
-//			this list of conditions and the following disclaimer.
-//		- Redistributions in binary form must reproduce the above copyright
-//			notice, this list of conditions and the following disclaimer
-//			in the documentation and/or other materials provided with the
-//			distribution.
-//		- Neither the name of the University of California, Berkeley nor the
-//			names of its contributors may be used to endorse or promote
-//			products derived from this software without specific prior
-//			written permission.
-//
-//	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-//	ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-//	WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-//	DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-//	ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-//	(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-//	LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-//	ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-//	(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-//	SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//==============================================================================
-
-//==============================================================================
-//	Includes
-//==============================================================================
 `include "Const.vh"
-//==============================================================================
 
-//------------------------------------------------------------------------------
-//	Module:		SynthesizedDRAM
-//	Desc:		This is a general synthesized RAM implementation of the DRAM
-//				interface.  The RAM module upon which it is based it more
-//				flexible and can have more ports, so this implementation of the
-//				DRAM interface is intended primarily for testing, verification
-//				and compatibility purposes.
-//
-//	Params:		UWidth:	The maskabale and addressable unit of memory.  Typically
-//						this would be 8b for normal DRAM based designs, but it is
-//						variable for this module.
-//				AWidth:	The width of the CommandAddress input, which determines
-//						the amount of addressable memory.  There are
-//						(2^AWidth) * UWidth total bits of memory.
-//				DWidth:	The width of the data input and output.  Note that
-//						this may be smaller than a single burst transfer.
-//				BurstLen: The number of DWidth wide words per DRAM operation.
-//				Class1:	Should this implementation use class1 FIFO interfaces?
-//						This will reduce the memory bandwidth to 50% when
-//						reading, as the inputs must be registered in a FIFO to
-//						accomplish this.
-//	Author:		<a href="http://www.gdgib.com/">Greg Gibeling</a>
-//	Version:	$Revision: 26904 $
-//------------------------------------------------------------------------------
 module	SynthesizedRandDRAM(
 			//------------------------------------------------------------------
 			//	System I/O
@@ -117,7 +51,8 @@ module	SynthesizedRandDRAM(
 						InDataBufDepth =		16,
 	                    OutInitLat =            30,    // model dram latency
 	                    OutBandWidth =          79,    // percent
-	                         
+	                    InBandWidth =			50,
+						
                         UWidth =				9, // 9b units matches XCV5 BRAM
                         AWidth =				12,	// 36Kb
                         DWidth =				UWidth, // 9b transfers
@@ -199,6 +134,7 @@ module	SynthesizedRandDRAM(
     //--------------------------------------------------------------------------
     //	Internal signals
     //--------------------------------------------------------------------------
+	
     wire	[AWidth-1:0]	CommandAddress_Internal;
     wire	[DRAMCMD_CWidth-1:0] Command_Internal;
     wire					CommandValid_Internal;
@@ -214,6 +150,8 @@ module	SynthesizedRandDRAM(
     wire	[ERWidth-1:0]	DataOutErrorCorrected_Internal;
     wire					DataOutValid_Internal;
     wire					DataOutReady_Internal;
+	
+	wire					DataInValid_Pre, DataInReady_Pre;
 		
     FIFORAM	#(				.Width(					DRAMCMD_CWidth + AWidth),
                             .Buffering(				InBufDepth))
@@ -231,13 +169,12 @@ module	SynthesizedRandDRAM(
                 din_buf(	.Clock(					Clock),
                             .Reset(					Reset),
                             .InData(				{DataIn, DataInMask}),
-                            .InValid(				DataInValid),
-                            .InAccept(				DataInReady),
+                            .InValid(				DataInValid_Pre),
+                            .InAccept(				DataInReady_Pre),
                             .OutData(				{DataIn_Internal, DataInMask_Internal}),
                             .OutSend(				DataInValid_Internal),
                             .OutReady(				DataInReady_Internal));	
 
-    			
     SynthesizedDRAM	#(		.UWidth(				UWidth),
                             .AWidth(				AWidth),
                             .DWidth(				DWidth),
@@ -269,8 +206,8 @@ module	SynthesizedRandDRAM(
                             .DataOutReady(			DataOutReady_Internal)
                 );
 	
-    wire        Stall, DataOutValid_Rand, DataOutReady_Rand;
-    reg  [7:0]  RandModulator;
+    wire        Stall, Stall2, DataOutValid_Rand, DataOutReady_Rand;
+    reg [6:0]   RandModulator, RandModulator2;
 	
     FIFORAM #(				.Width(					DWidth + EHWidth + ERWidth),
 							.FWLatency(				OutInitLat),
@@ -282,16 +219,24 @@ module	SynthesizedRandDRAM(
                 			.InAccept(				DataOutReady_Internal),
                 			.OutData(				{DataOut, 			DataOutErrorChecked, 			DataOutErrorCorrected}),
                 			.OutSend(				DataOutValid_Rand),
-                			.OutReady(				DataOutReady_Rand));	
-	
- 
+                			.OutReady(				DataOutReady_Rand));
     
-    always @ (posedge Clock)
-        RandModulator <= $random % 100;
+	reg [6:0] rand1, rand2; // convert random to unsigned
+	
+    always @ (posedge Clock) begin
+		rand1 = $random;
+		rand2 = $random;
+        RandModulator = rand1 % 100;
+		RandModulator2 = rand2 % 100;
+	end
 	
 	assign Stall = RandModulator > OutBandWidth;
 	assign DataOutValid = DataOutValid_Rand && !Stall;
 	assign DataOutReady_Rand = DataOutReady && !Stall;
+	
+	assign Stall2 = RandModulator2 > InBandWidth;
+	assign DataInValid_Pre = !Stall2 & DataInValid;
+	assign DataInReady = !Stall2 & DataInReady_Pre;
 	
 endmodule
 //------------------------------------------------------------------------------
