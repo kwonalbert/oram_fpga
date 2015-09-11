@@ -1,4 +1,12 @@
 
+*** NOTE: the testORAMSystem test is a bit out of date and won't compile right 
+    now.  The problems are minor: it would be great for someone to bring it 
+	back to life :-) 
+	
+	For now, please see the top level readme (quick installation) on running 
+	the code in simulation.
+	***
+
 This README describes how to verify that 
 
 (a) Tiny ORAM works out-of-the-box in RTL simulation,
