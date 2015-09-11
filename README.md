@@ -40,20 +40,27 @@ files:
                       creating Xilinx projects)
 
 --------------------------------------------------------------------------------
-What to do next
+Quick installation
 --------------------------------------------------------------------------------
 
-1.)	Go through & familiarize yourself with the code.
+1.)	Test the code.
+	
+1a.) 	Create an FPGA project (e.g., Xilinx Vivado or ISE).
+1b.) 	Add all verilog (including *.vh files) from ./oram/* and ./gatelib/*.
+1c.)	Add these flags/macros when simulating/synthesizing:
+		MACROSAFE=1
+		SIMULATION=1
+		SIMULATION_VIVADO=1
+		FPGA_MEMORY=1
+		
+1d.) 	Use ./oram/frontend/test/testUORAM.v as the top level testbench.
+		Run this simulation for a while and inspect the waveforms to see how it 
+		works.
 
-Refer to ./oram/README.txt for code structure and naming conventions.
+There are also some more sophisticated/automated testbenches but they are a bit 
+out of date: See ./tests/README.txt for more information.
 	
-2.)	Test the code.
-	
-Feel free to create an FPGA project (e.g., Xilinx Vivado or ISE) to test the 
-code yourself.  We have included some automated tests as well.  See 
-./tests/README.txt for more information.
-	
-3.) Test your board.
+2.) Test your board.
 
 If you plan to only work in software/RTL simulation, you can skip this step.
 
@@ -62,10 +69,6 @@ sure the hardware (e.g., the DRAM) on your board works correctly.  We have
 designed some out-of-the-box sanity checks to test your board's hardware.  See 
 ./tests/README.txt for more information.
 	
-4.) Create a Vivado project and create a bitstream.
-
-TODD Refer to ./scripts/README.txt for some useful scripts to automate this process.
-
 --------------------------------------------------------------------------------
 Expected performance/area figures
 --------------------------------------------------------------------------------
