@@ -4,8 +4,7 @@
 	back to life :-) 
 	
 	For now, please see the top level readme (quick installation) on running 
-	the code in simulation.
-	***
+	the code in simulation. ***
 
 This README describes how to verify that 
 

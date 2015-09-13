@@ -30,14 +30,15 @@ Directory tree
 For further explanations and instructions, we have included additional README 
 files:
 
-./oram/README.txt: 	Gives an overview for the Tiny ORAM architecture, code 
-					organization and conventions.
+./oram/README.txt:
+	Gives an overview for the Tiny ORAM architecture, code organization and 
+	conventions.
 
-./tests/README.txt:	Gives instructions on how to test Tiny ORAM in simulation 
-					and also verify that your FPGA board isn't broken. 
-
-./scripts/README.txt: Gives some scripts to automate tedious tasks (such as 
-                      creating Xilinx projects)
+./tests/README.txt:	
+	Infrastructure for doing sophisticated unit tests on the ORAM (a bit out 
+	of date -- for how to run the code in simulation, see below "Quick 
+	Installation").  Gives infrastructure for how to verify that your FPGA board 
+	isn't broken. 
 
 --------------------------------------------------------------------------------
 Quick installation
@@ -46,7 +47,9 @@ Quick installation
 1.)	Test the code.
 	
 1a.) 	Create an FPGA project (e.g., Xilinx Vivado or ISE).
+
 1b.) 	Add all verilog (including *.vh files) from ./oram/* and ./gatelib/*.
+
 1c.)	Add these flags/macros when simulating/synthesizing:
 		MACROSAFE=1
 		SIMULATION=1
@@ -73,4 +76,8 @@ designed some out-of-the-box sanity checks to test your board's hardware.  See
 Expected performance/area figures
 --------------------------------------------------------------------------------
 
-TODO quote some performance / expected area stats
+See this paper:
+
+Christopher W. Fletcher, Ling Ren, Albert Kwon, Marten van Dijk, Emil Stefanov, 
+Dimitrios Serpanos, Srinivas Devadas. 2015.  A Low-Latency, Low-Area Hardware 
+Oblivious RAM Controller.  In Proceedings of FCCM'15.
