@@ -12,8 +12,10 @@
 This README describes the tiny ORAM directory structure and gives some 
 performance/area statistics to sanity check your tools.
 
-***NOTE*** All files in this project assume that tabs = 4 spaces.  Configure 
+NOTE 1:  All files in this project assume that tabs = 4 spaces.  Configure 
 your text editor accordingly!
+
+NOTE 2:  Make sure to point /oram to branch 'oram_fpga_public', NOT 'master'.
 
 --------------------------------------------------------------------------------
 Directory tree
